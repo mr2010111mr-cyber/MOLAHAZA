@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 6px;b
 <script>
 function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.theme=t}catch(e){}$('#th').textContent=t=='dark'?'☀️ فاتح':'🌙 داكن'}
 function toggleTheme(){setTheme(document.documentElement.dataset.theme=='dark'?'light':'dark')}
-const API_URL="https://script.google.com/macros/s/AKfycbxhVPNs1h6N7QLIJJ6QPyYT2icy0g1fKaCYdGSsyoWPdn_9u-7KFn1vjg-NheeahSSf/exec";
+const API_URL="https://script.google.com/macros/s/AKfycbz9eLLU9YyA8LDEQDarz9Z5tD6CXd9eDjbn_IqQqYYPiO4zusDxCWm-nje6LPoTbwMIHg/exec";
 const $=s=>document.querySelector(s),app=$('#app'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const S={nid:localStorage.nid||'',pass:'',tab:'duties'};let D={},G={n:5,c:10,p:1,d:'',skip:[5],hol:[],rows:[]},PK,F='';
 setTheme(document.documentElement.dataset.theme||'light');
@@ -90,8 +90,8 @@ function admLogin(){modal(`<h3>دخول الإدارة</h3><input id=pw type=pas
 async function admEnter(){S.pass=$('#pw').value;D=await api('adm_get',{pass:S.pass});closeM();S.tab='gen';adm()}
 const reload=async()=>D=await api('adm_get',{pass:S.pass});
 const A=(a,d)=>api(a,{pass:S.pass,...d});
-function adm(){$('#ttl').textContent=D.cfg.title;const T=[['gen','التوزيع'],['obs','الملاحظون'],['sch','الجدول'],['sw','التبديلات'],['rep','التقارير']];
-app.innerHTML=`<div class=hero><small>لوحة الإدارة</small><h2>${D.obs.length} ملاحظ · ${D.sch.length} خانة</h2><div class=chips><span onclick=out() style=cursor:pointer>خروج</span></div></div><nav>${T.map(([k,t])=>`<button class="${S.tab==k?'on':''}" onclick="S.tab='${k}';adm()">${t}</button>`).join('')}</nav><div id=bd>${{gen:tGen,obs:tObs,sch:tSch,sw:tSw,rep:tRep}[S.tab]()}</div>`}
+function adm(){$('#ttl').textContent=D.cfg.title;const T=[['gen','التوزيع'],['obs','الملاحظون'],['sch','الجدول'],['sw','التبديلات'],['rep','التقارير'],['data','البيانات']];
+app.innerHTML=`<div class=hero><small>لوحة الإدارة</small><h2>${D.obs.length} ملاحظ · ${D.sch.length} خانة</h2><div class=chips><span onclick=out() style=cursor:pointer>خروج</span></div></div><nav>${T.map(([k,t])=>`<button class="${S.tab==k?'on':''}" onclick="goTab('${k}')">${t}</button>`).join('')}</nav><div id=bd>${{gen:tGen,obs:tObs,sch:tSch,sw:tSw,rep:tRep,data:tData}[S.tab]()}</div>`}
 
 const WD=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 function tGen(){return `<div class=card><h3>إعداد أيام الملاحظة</h3><div class=grid><label>عدد الأيام<input id=nd type=number min=1 value=${G.n}></label><label>اللجان كل يوم<input id=nc type=number min=1 value=${G.c}></label><label>ملاحظون لكل لجنة<input id=np type=number min=1 value=${G.p}></label><label>تاريخ أول يوم<input id=d0 type=date value="${G.d}"></label></div><label>الإجازة الأسبوعية (الأحمر = يُستثنى)</label><div class=btns>${WD.map((w,i)=>`<button class="${G.skip.includes(i)?'no':'o'}" onclick=tg(${i})>${w}</button>`).join('')}</div><label>إجازات رسمية أو تواريخ مستثناة</label><div class=add><input id=hd type=date><button class=o style="width:auto" onclick=addHol()>استثناء</button></div><div class=btns>${G.hol.map((h,i)=>`<span class=pill>${lab(h)} <a onclick=delHol(${i}) style="cursor:pointer">✕</a></span>`).join('')}</div><button class=g onclick=prep()>تجهيز الأيام</button></div>${daysH()}`}
@@ -153,5 +153,28 @@ const RS=[()=>[R.sch()],()=>[R.obs()],()=>[R.mat()],()=>R.days(),()=>[R.sw()],()
 async function exp(k){if(!D.sch.length)return toast('لا يوجد جدول بعد، ابدأ بالتوزيع',1);await xlx(FN[k],RS[k]())}
 function impSch(f){readX(f,async j=>{const kd=key(j,['يوم']),kc=key(j,['لجنة']),ki=key(j,['قوم','رقم']),kn=key(j,['اسم']);if(!kd||!kc||!ki)return toast('الأعمدة المطلوبة: اليوم، اللجنة، الرقم القومي',1);if(!confirm(`استيراد ${j.length} صف سيستبدل الجدول الحالي. متابعة؟`))return;await A('adm_sch',{list:j.map(r=>({day:r[kd],committee:r[kc],nid:norm(r[ki]),name:kn?r[kn]:''}))});await reload();toast('تم استيراد الجدول');S.tab='sch';adm()})}
 async function saveCfg(){await A('adm_cfg',{title:$('#ct').value,swap:$('#cs').value,newPass:$('#cp').value});if($('#cp').value)S.pass=$('#cp').value;await reload();toast('تم الحفظ');adm()}
+
+/* ===== إدارة البيانات والتراجع ===== */
+let X={days:[],nids:[],q:'',mode:'redistribute'},BK=[];
+const goTab=k=>{S.tab=k;k=='data'?loadBk():adm()};
+async function loadBk(){BK=await A('adm_backups');adm()}
+const DAYS=()=>[...new Set(D.sch.map(s=>s.day))];
+function olH(){const c=cnt();return D.obs.filter(o=>!X.q||o.name.includes(X.q)).slice(0,80).map(o=>`<label class=row2><input type=checkbox style="width:auto;margin:0" ${X.nids.includes(o.nid)?'checked':''} onchange="tgO('${o.nid}')"><div><b>${esc(o.name)}</b><small>${esc(o.nid)}</small></div><span class=pill>${c[o.nid]||0}</span></label>`).join('')||'<p class=m>لا توجد نتائج</p>'}
+function tgO(n){const k=X.nids.indexOf(n);k<0?X.nids.push(n):X.nids.splice(k,1);$('#oc').textContent=X.nids.length}
+function tgD(i){const d=DAYS()[i],k=X.days.indexOf(d);k<0?X.days.push(d):X.days.splice(k,1);adm()}
+function tData(){const DL=DAYS();return `<div class=card><h3>حذف أيام محددة</h3><p class=m>اضغط على الأيام المراد حذفها بكل مناوباتها (الرقم = عدد الخانات).</p><div class=btns>${DL.map((d,i)=>`<button class="${X.days.includes(d)?'no':'o'}" onclick=tgD(${i})>${esc(d)} (${D.sch.filter(s=>s.day==d).length})</button>`).join('')||'<span class=m>لا يوجد جدول.</span>'}</div><button class=no style="width:100%" onclick=dDays()>حذف الأيام المحددة (${X.days.length})</button></div>
+<div class=card><h3>حذف ملاحظين</h3><input placeholder="ابحث بالاسم…" value="${esc(X.q)}" oninput="X.q=this.value;$('#ol').innerHTML=olH()"><div id=ol style="max-height:260px;overflow:auto">${olH()}</div><label>ماذا يحدث لمناوباتهم؟<select onchange="X.mode=this.value"><option value=redistribute ${X.mode=='redistribute'?'selected':''}>إعادة توزيعها على الباقين بالتساوي (موصى به)<option value=drop ${X.mode=='drop'?'selected':''}>حذفها من الجدول<option value=keep ${X.mode=='keep'?'selected':''}>إبقاء الجدول كما هو</select></label><button class=no style="width:100%" onclick=dObs()>حذف الملاحظين المحددين (<span id=oc>${X.nids.length}</span>)</button></div>
+<div class=card><h3>طلبات التبديل</h3><div class=btns><button class=o onclick="dSw('closed')">مسح السجل المنتهي</button><button class=o onclick="dSw('pending')">إلغاء المعلقة</button><button class=no onclick="dSw('all')">مسح الكل</button></div></div>
+<div class=card><h3>تصفير شامل</h3><div class=btns><button class=o onclick="preset('wS')">بداية فصل جديد</button><button class=o onclick="preset('wS wO wC')">كل شيء</button></div>
+<label class=row2><input type=checkbox id=wS style="width:auto;margin:0"><div>الجدول <small>مع كل طلبات التبديل</small></div></label><label class=row2><input type=checkbox id=wW style="width:auto;margin:0"><div>طلبات التبديل فقط</div></label><label class=row2><input type=checkbox id=wO style="width:auto;margin:0"><div>قائمة الملاحظين</div></label><label class=row2><input type=checkbox id=wC style="width:auto;margin:0"><div>الإعدادات <small>تبقى كلمة المرور</small></div></label>
+<input id=wc placeholder="اكتب «مسح» للتأكيد"><button class=no style="width:100%" onclick=wipe()>تنفيذ المسح</button></div>
+<div class=card><h3>النسخ الاحتياطية والتراجع</h3><p class=m>تؤخذ نسخة تلقائياً قبل أي حذف أو توزيع أو استيراد، وتُحفظ آخر 5 نسخ.</p>${BK.map(b=>`<div class=row2><div><b>${esc(b.label)}</b><small>${when(b.created)}</small></div><button class=g onclick="rst('${b.id}')">استرجاع</button></div>`).join('')||'<p class=m>لا توجد نسخ بعد.</p>'}</div>`}
+async function fin(msg){await reload();BK=await A('adm_backups');X.days=[];X.nids=[];toast(msg+' — يمكنك التراجع من النسخ الاحتياطية');adm()}
+async function dDays(){if(!X.days.length)return toast('اختر يوماً واحداً على الأقل',1);if(!confirm(`حذف ${X.days.length} يوم بكل مناوباتها؟`))return;const r=await A('adm_delDays',{days:X.days});await fin(`حُذفت ${r} مناوبة`)}
+async function dObs(){if(!X.nids.length)return toast('اختر ملاحظاً واحداً على الأقل',1);if(!confirm(`حذف ${X.nids.length} ملاحظ؟`))return;const r=await A('adm_delObs',{nids:X.nids,mode:X.mode});await fin(X.mode=='redistribute'?`أُعيد توزيع ${r.moved} مناوبة`+(r.dropped?` وتعذر ${r.dropped} (لا يوجد ملاحظ متاح)`:''):X.mode=='drop'?`حُذفت ${r.dropped} مناوبة`:'تم حذف الملاحظين')}
+async function dSw(m){if(!confirm({closed:'مسح السجل المنتهي؟',pending:'إلغاء كل الطلبات المعلقة؟',all:'مسح كل طلبات التبديل؟'}[m]))return;await A('adm_swaps',{mode:m});await fin('تم')}
+const preset=a=>['wS','wW','wO','wC'].forEach(i=>$('#'+i).checked=a.split(' ').includes(i));
+async function wipe(){const t=[['wS','schedule'],['wW','swaps'],['wO','observers'],['wC','settings']].filter(([i])=>$('#'+i).checked).map(x=>x[1]);if(!t.length)return toast('اختر ما تريد مسحه',1);if($('#wc').value.trim()!='مسح')return toast('اكتب كلمة «مسح» للتأكيد',1);await A('adm_wipe',{targets:t});await fin('تم المسح')}
+async function rst(id){if(!confirm('استرجاع هذه النسخة؟ ستُستبدل البيانات الحالية (وتؤخذ نسخة منها قبل ذلك).'))return;await A('adm_restore',{id});await fin('تم الاسترجاع')}
 if(API_URL.startsWith('PASTE'))app.innerHTML='<div class=card><h3>خطوة أخيرة</h3><p class=m>ضع رابط Web App في المتغير API_URL داخل الملف.</p></div>';else login();
 </script></body></html>
